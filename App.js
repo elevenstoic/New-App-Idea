@@ -1,88 +1,36 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, StatusBar, Animated } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, StatusBar } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import QuoteMode from './components/QuoteMode';
-import WallpaperMode from './components/WallpaperMode';
+import HomeScreen from './screens/HomeScreen';
+import FavoritesScreen from './screens/FavoritesScreen';
+import CustomizeScreen from './screens/CustomizeScreen';
+import WallpaperScreen from './screens/WallpaperScreen';
 import LiquidGlassNav from './components/LiquidGlassNav';
+import HamburgerMenu from './components/HamburgerMenu';
 import { setupNotifications, scheduleDailyQuotes } from './utils/notifications';
-import { loadSettings, saveSettings } from './utils/storage';
+import { loadSettings, saveSettings, loadFavorites, saveFavorites, loadTheme, saveTheme } from './utils/storage';
 
 export default function App() {
-  const [mode, setMode] = useState('quote'); // 'quote' or 'wallpaper'
+  const [currentScreen, setCurrentScreen] = useState('home'); // 'home', 'favorites', 'customize', 'wallpaper'
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [favorites, setFavorites] = useState([]);
+  const [theme, setTheme] = useState({
+    name: 'purple',
+    colors: ['#0f0c29', '#302b63', '#24243e'],
+    font: 'default'
+  });
   const [settings, setSettings] = useState({
     notificationsEnabled: true,
     dailyQuoteCount: 1,
   });
 
-  // Animation values for mode switching
-  const quoteOpacity = useRef(new Animated.Value(1)).current;
-  const wallpaperOpacity = useRef(new Animated.Value(0)).current;
-  const quoteScale = useRef(new Animated.Value(1)).current;
-  const wallpaperScale = useRef(new Animated.Value(0.9)).current;
-
   useEffect(() => {
-    // Initialize app
     initializeApp();
   }, []);
 
-  useEffect(() => {
-    // Animate mode switching
-    if (mode === 'quote') {
-      Animated.parallel([
-        Animated.timing(quoteOpacity, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.spring(quoteScale, {
-          toValue: 1,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-        Animated.timing(wallpaperOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(wallpaperScale, {
-          toValue: 0.9,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(wallpaperOpacity, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.spring(wallpaperScale, {
-          toValue: 1,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-        Animated.timing(quoteOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(quoteScale, {
-          toValue: 0.9,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [mode]);
-
   const initializeApp = async () => {
-    // Setup notifications
     await setupNotifications();
 
-    // Load user settings
     const savedSettings = await loadSettings();
     if (savedSettings) {
       setSettings(savedSettings);
@@ -90,19 +38,88 @@ export default function App() {
         await scheduleDailyQuotes(savedSettings.dailyQuoteCount);
       }
     }
+
+    const savedFavorites = await loadFavorites();
+    if (savedFavorites) {
+      setFavorites(savedFavorites);
+    }
+
+    const savedTheme = await loadTheme();
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
   };
 
-  const handleModeSwitch = (newMode) => {
-    setMode(newMode);
+  const handleNavigate = (screen) => {
+    setCurrentScreen(screen);
+    setMenuOpen(false);
   };
 
-  const updateSettings = async (newSettings) => {
+  const handleToggleFavorite = async (quote) => {
+    const isFavorite = favorites.some(fav => fav.text === quote.text);
+    let newFavorites;
+
+    if (isFavorite) {
+      newFavorites = favorites.filter(fav => fav.text !== quote.text);
+    } else {
+      newFavorites = [...favorites, quote];
+    }
+
+    setFavorites(newFavorites);
+    await saveFavorites(newFavorites);
+  };
+
+  const handleUpdateTheme = async (newTheme) => {
+    setTheme(newTheme);
+    await saveTheme(newTheme);
+  };
+
+  const handleUpdateSettings = async (newSettings) => {
     setSettings(newSettings);
     await saveSettings(newSettings);
 
-    // Update notifications
     if (newSettings.notificationsEnabled) {
       await scheduleDailyQuotes(newSettings.dailyQuoteCount);
+    }
+  };
+
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case 'home':
+        return (
+          <HomeScreen
+            theme={theme}
+            favorites={favorites}
+            onToggleFavorite={handleToggleFavorite}
+          />
+        );
+      case 'favorites':
+        return (
+          <FavoritesScreen
+            theme={theme}
+            favorites={favorites}
+            onToggleFavorite={handleToggleFavorite}
+          />
+        );
+      case 'customize':
+        return (
+          <CustomizeScreen
+            theme={theme}
+            onUpdateTheme={handleUpdateTheme}
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
+          />
+        );
+      case 'wallpaper':
+        return <WallpaperScreen theme={theme} />;
+      default:
+        return (
+          <HomeScreen
+            theme={theme}
+            favorites={favorites}
+            onToggleFavorite={handleToggleFavorite}
+          />
+        );
     }
   };
 
@@ -110,38 +127,18 @@ export default function App() {
     <GestureHandlerRootView style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <View style={styles.container}>
-        <Animated.View
-          style={[
-            styles.modeContainer,
-            {
-              opacity: quoteOpacity,
-              transform: [{ scale: quoteScale }],
-            },
-          ]}
-          pointerEvents={mode === 'quote' ? 'auto' : 'none'}
-        >
-          <QuoteMode />
-        </Animated.View>
+        {renderScreen()}
 
-        <Animated.View
-          style={[
-            styles.modeContainer,
-            StyleSheet.absoluteFill,
-            {
-              opacity: wallpaperOpacity,
-              transform: [{ scale: wallpaperScale }],
-            },
-          ]}
-          pointerEvents={mode === 'wallpaper' ? 'auto' : 'none'}
-        >
-          <WallpaperMode />
-        </Animated.View>
+        <HamburgerMenu
+          isOpen={menuOpen}
+          onToggle={() => setMenuOpen(!menuOpen)}
+          onNavigate={handleNavigate}
+          currentScreen={currentScreen}
+        />
 
         <LiquidGlassNav
-          currentMode={mode}
-          onModeSwitch={handleModeSwitch}
-          settings={settings}
-          onSettingsUpdate={updateSettings}
+          currentScreen={currentScreen}
+          onNavigate={handleNavigate}
         />
       </View>
     </GestureHandlerRootView>

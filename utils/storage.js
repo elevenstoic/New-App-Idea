@@ -5,6 +5,8 @@ const LAST_QUOTE_DATE_KEY = '@last_quote_date';
 const LAST_WALLPAPER_DATE_KEY = '@last_wallpaper_date';
 const CURRENT_QUOTE_INDEX_KEY = '@current_quote_index';
 const CURRENT_WALLPAPER_INDEX_KEY = '@current_wallpaper_index';
+const FAVORITES_KEY = '@app_favorites';
+const THEME_KEY = '@app_theme';
 
 export async function saveSettings(settings) {
   try {
@@ -103,5 +105,45 @@ export async function getCurrentWallpaperIndex() {
   } catch (error) {
     console.error('Error getting current wallpaper index:', error);
     return 0;
+  }
+}
+
+export async function saveFavorites(favorites) {
+  try {
+    await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+    return true;
+  } catch (error) {
+    console.error('Error saving favorites:', error);
+    return false;
+  }
+}
+
+export async function loadFavorites() {
+  try {
+    const favorites = await AsyncStorage.getItem(FAVORITES_KEY);
+    return favorites ? JSON.parse(favorites) : [];
+  } catch (error) {
+    console.error('Error loading favorites:', error);
+    return [];
+  }
+}
+
+export async function saveTheme(theme) {
+  try {
+    await AsyncStorage.setItem(THEME_KEY, JSON.stringify(theme));
+    return true;
+  } catch (error) {
+    console.error('Error saving theme:', error);
+    return false;
+  }
+}
+
+export async function loadTheme() {
+  try {
+    const theme = await AsyncStorage.getItem(THEME_KEY);
+    return theme ? JSON.parse(theme) : null;
+  } catch (error) {
+    console.error('Error loading theme:', error);
+    return null;
   }
 }
